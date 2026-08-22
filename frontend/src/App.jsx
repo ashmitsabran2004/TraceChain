@@ -5,6 +5,8 @@ import ProvenanceGraph from './components/ProvenanceGraph';
 import ClaimInspector from './components/ClaimInspector';
 import EvaluationDashboard from './components/EvaluationDashboard';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('studio'); // 'studio', 'inspector', 'eval'
   const [presets, setPresets] = useState([]);
@@ -23,7 +25,7 @@ export default function App() {
 
   const fetchPresets = async () => {
     try {
-      const res = await fetch('/api/presets');
+      const res = await fetch(`${API_URL}/api/presets`);
       if (res.ok) {
         const data = await res.json();
         setPresets(data);
@@ -36,7 +38,7 @@ export default function App() {
   const handleRunAnalysis = async (requestData) => {
     setIsRunning(true);
     try {
-      const res = await fetch('/api/analyze', {
+      const res = await fetch(`${API_URL}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestData)
@@ -63,7 +65,7 @@ export default function App() {
 
     if (type === 'claim' && currentRes) {
       try {
-        const res = await fetch(`/api/lineage?request_id=${currentRes.request_id}&claim_id=${nodeId}`);
+        const res = await fetch(`${API_URL}/api/lineage?request_id=${currentRes.request_id}&claim_id=${nodeId}`);
         if (res.ok) {
           const data = await res.json();
           const combined = new Set([...data.ancestor_claim_ids, ...data.ancestor_source_ids]);
@@ -80,7 +82,7 @@ export default function App() {
   const handleRunEvaluation = async () => {
     setIsRunningEval(true);
     try {
-      const res = await fetch('/api/evaluate', { method: 'POST' });
+      const res = await fetch(`${API_URL}/api/evaluate`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setEvalResults(data);
