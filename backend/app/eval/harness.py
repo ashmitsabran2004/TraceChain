@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
 from backend.app.schemas import EvalTestCase, EvalMetricResult, AnalysisRequest, VerificationStatus
 from backend.app.orchestrator import MultiAgentOrchestrator
 from backend.app.eval.datasets import EVAL_TEST_CASES
@@ -16,21 +17,22 @@ class EvaluationHarness:
     def run_single_eval(self, test_case: EvalTestCase) -> EvalMetricResult:
         request = AnalysisRequest(
             query=test_case.query,
-            documents=test_case.documents
+            documents=test_case.documents,
+            mode="DEMO"
         )
-        
+
         response = self.orchestrator.execute_pipeline(request)
         trace_graph = response.trace_graph
         claims = trace_graph.claims
 
         total_claims = len(claims)
-        
+
         # Enforce exact status partition
         verified_count = sum(1 for c in claims if (c.verification_status.value if isinstance(c.verification_status, VerificationStatus) else str(c.verification_status)) == "VERIFIED")
         partial_count = sum(1 for c in claims if (c.verification_status.value if isinstance(c.verification_status, VerificationStatus) else str(c.verification_status)) == "PARTIALLY_SUPPORTED")
         unsupported_count = sum(1 for c in claims if (c.verification_status.value if isinstance(c.verification_status, VerificationStatus) else str(c.verification_status)) == "UNSUPPORTED")
         conflicting_count = sum(1 for c in claims if (c.verification_status.value if isinstance(c.verification_status, VerificationStatus) else str(c.verification_status)) == "CONFLICTING")
-        
+
         # Mathematically enforce sum equality
         unresolved_count = max(0, total_claims - (verified_count + partial_count + unsupported_count + conflicting_count))
 
@@ -97,8 +99,6 @@ class EvaluationHarness:
         return res
 
     def run_all_evals(self) -> List[EvalMetricResult]:
-        results = []
-        for test_case in EVAL_TEST_CASES:
-            res = self.run_single_eval(test_case)
-            results.append(res)
-        return results
+        # Cases are independent; retain dataset order while reducing request duration.
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            return list(executor.map(self.run_single_eval, EVAL_TEST_CASES))
